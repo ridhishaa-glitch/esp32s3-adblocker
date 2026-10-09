@@ -1,0 +1,37 @@
+name: Build blocklist
+
+# Rebuilds the compiled blocklist weekly and publishes it as a rolling release
+# asset. Point the device's "Blocklist .bin URL" at:
+#   https://github.com/<you>/<repo>/releases/download/blocklist-latest/blocklist.bin
+on:
+  schedule:
+    - cron: "0 4 * * 1"      # every Monday 04:00 UTC
+  workflow_dispatch: {}       # allow manual runs
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install -r tools/requirements.txt
+
+      - name: Compile blocklist
+        run: python tools/build_blocklist.py -o blocklist.bin
+
+      - name: Publish rolling release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete blocklist-latest --yes --cleanup-tag || true
+          gh release create blocklist-latest blocklist.bin \
+            --title "Latest blocklist" \
+            --notes "Auto-built $(date -u +%Y-%m-%d) — StevenBlack + Hagezi light."

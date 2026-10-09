@@ -1,0 +1,53 @@
+name: Build firmware
+
+# Compiles the firmware on every push/PR so breakage is caught in CI, and
+# publishes firmware.bin as a rolling release for web OTA updates.
+on:
+  push:
+    branches: [main]
+    paths: ["src/**", "platformio.ini", "partitions.csv", ".github/workflows/build-firmware.yml"]
+  pull_request:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Build
+        run: pio run
+
+      - name: Collect artifacts
+        run: |
+          cp .pio/build/esp32s3/firmware.bin firmware.bin
+          cp .pio/build/esp32s3/bootloader.bin bootloader.bin || true
+          cp .pio/build/esp32s3/partitions.bin partitions.bin || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: |
+            firmware.bin
+            bootloader.bin
+            partitions.bin
+
+      - name: Publish rolling firmware release
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete firmware-latest --yes --cleanup-tag || true
+          gh release create firmware-latest firmware.bin bootloader.bin partitions.bin \
+            --title "Latest firmware" \
+            --notes "CI build of ${{ github.sha }}"

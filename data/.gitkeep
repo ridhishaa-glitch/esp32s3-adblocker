@@ -1,0 +1,4 @@
+# Place a locally-built blocklist.bin here if you want to pre-load it over USB:
+#   python tools/build_blocklist.py -o data/blocklist.bin
+#   pio run -t uploadfs
+# Otherwise the device downloads it from the configured URL on first boot.
